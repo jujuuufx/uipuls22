@@ -38,9 +38,7 @@ local Notifications  = Pulse.Notifications
 
 local themes = {
     preset = {
-    preset = {
         accent       = rgb(130, 150, 255),   -- Premium Blue/Purple
-        glow         = rgb(80, 100, 255),    -- Glowing Blue
         
         background   = rgb(18, 18, 22),      -- Deep Dark Background
         section      = rgb(24, 24, 28),      -- Section Background
@@ -191,23 +189,6 @@ function Pulse:Window(properties)
         Size = Cfg.Size, BackgroundTransparency = 1, BorderSizePixel = 0
     })
     
-    Items.Glow = Pulse:Create("ImageLabel", {
-        ImageColor3 = themes.preset.glow,
-        ScaleType = Enum.ScaleType.Slice,
-        ImageTransparency = 0.6499999761581421,
-        BorderColor3 = rgb(0, 0, 0),
-        Parent = Items.Wrapper,
-        Name = "\0",
-        Size = dim2(1, 40, 1, 40),
-        Image = "rbxassetid://18245826428",
-        BackgroundTransparency = 1,
-        Position = dim2(0, -20, 0, -20),
-        BackgroundColor3 = rgb(255, 255, 255),
-        BorderSizePixel = 0,
-        SliceCenter = rect(vec2(21, 21), vec2(79, 79)),
-        ZIndex = 0
-    })
-    Pulse:Themify(Items.Glow, "glow", "ImageColor3")
 
     Items.Window = Pulse:Create("Frame", {
         Parent = Items.Wrapper, Position = dim2(0, 0, 0, 0), Size = dim2(1, 0, 1, 0),
@@ -275,39 +256,49 @@ function Pulse:Window(properties)
     })
 
     -- Watermark System (Floating)
+    local drawWatermark = properties.Watermark
+    if drawWatermark == nil then drawWatermark = true end
+
     Pulse.Watermark = Pulse:Create("Frame", {
         Parent = Pulse.Gui, Position = dim2(1, -20, 0, 20), AnchorPoint = vec2(1, 0),
-        Size = dim2(0, 0, 0, 26), BackgroundTransparency = 1, ZIndex = 1000, AutomaticSize = Enum.AutomaticSize.X
+        Size = dim2(0, 0, 0, 0), BackgroundTransparency = 1, ZIndex = 1000, AutomaticSize = Enum.AutomaticSize.XY
     })
-    Pulse:Create("UIListLayout", { Parent = Pulse.Watermark, FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Right, Padding = dim(0, 8) })
+    Pulse:Create("UIListLayout", { Parent = Pulse.Watermark, FillDirection = Enum.FillDirection.Vertical, HorizontalAlignment = Enum.HorizontalAlignment.Right, Padding = dim(0, 6) })
 
-    local function CreateStatusBox(icon, text)
+    local function CreateStatusBox(icon, text_content, isRich, iconColor)
         local box = Pulse:Create("Frame", {
-            Parent = Pulse.Watermark, Size = dim2(0, 0, 1, 0), BackgroundColor3 = rgb(15, 15, 18),
+            Parent = Pulse.Watermark, Size = dim2(0, 0, 0, 26), BackgroundColor3 = rgb(25, 25, 29),
             BorderSizePixel = 0, AutomaticSize = Enum.AutomaticSize.X
         })
-        Pulse:Create("UICorner", { Parent = box, CornerRadius = dim(0, 4) })
-        Pulse:Create("UIStroke", { Parent = box, Color = themes.preset.outline, Thickness = 1 })
-        Pulse:Create("UIPadding", { Parent = box, PaddingLeft = dim(0, 8), PaddingRight = dim(0, 8) })
+        Pulse:Create("UICorner", { Parent = box, CornerRadius = dim(0, 6) })
+        Pulse:Create("UIPadding", { Parent = box, PaddingLeft = dim(0, 10), PaddingRight = dim(0, 10) })
         
-        local layout = Pulse:Create("UIListLayout", { Parent = box, FillDirection = Enum.FillDirection.Horizontal, VerticalAlignment = Enum.VerticalAlignment.Center, Padding = dim(0, 6) })
+        Pulse:Create("UIListLayout", { Parent = box, FillDirection = Enum.FillDirection.Horizontal, VerticalAlignment = Enum.VerticalAlignment.Center, Padding = dim(0, 6) })
         
-        local img = Pulse:Create("ImageLabel", {
-            Parent = box, Size = dim2(0, 14, 0, 14), BackgroundTransparency = 1, Image = icon, ImageColor3 = themes.preset.accent
-        })
+        if icon then
+            Pulse:Create("ImageLabel", {
+                Parent = box, Size = dim2(0, 14, 0, 14), BackgroundTransparency = 1, Image = icon, ImageColor3 = iconColor or themes.preset.subtext
+            })
+        end
+        
         local lbl = Pulse:Create("TextLabel", {
             Parent = box, BackgroundTransparency = 1, Size = dim2(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X,
-            Text = text, TextColor3 = themes.preset.text, TextSize = 12, FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium)
+            Text = text_content, TextColor3 = themes.preset.text, TextSize = 13, FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium),
+            RichText = isRich or false
         })
         return lbl
     end
 
-    local PingLbl = CreateStatusBox("rbxassetid://11293976662", "0 ping")
+    local WatermarkLbl = nil
+    if drawWatermark then
+        local wtext = type(properties.Watermark) == "string" and properties.Watermark or "this is a <font color=\"#" .. themes.preset.accent:ToHex() .. "\">watermark.</font>"
+        WatermarkLbl = CreateStatusBox(nil, wtext, true)
+    end
+    
     local FPSLbl = CreateStatusBox("rbxassetid://11293975734", "0 fps")
+    local PingLbl = CreateStatusBox("rbxassetid://11293976662", "0 ping")
     local UserLbl = CreateStatusBox("rbxassetid://11293977610", "logged in as " .. lp.Name)
-    local WatermarkLbl = CreateStatusBox("rbxassetid://11293977111", "this is a watermark.")
-    Pulse:Themify(WatermarkLbl.Parent:FindFirstChildOfClass("ImageLabel"), "accent", "ImageColor3")
-    WatermarkLbl.TextColor3 = themes.preset.accent
+    Items.UserStatus = UserLbl
 
     task.spawn(function()
         while task.wait(1) do
@@ -448,20 +439,17 @@ function Pulse:SubTab(properties)
     table.insert(self.SubTabs, Cfg)
 
     Items.Button = Pulse:Create("TextButton", { 
-        Parent = window.Items.TabHolder, Size = dim2(0, 0, 1, 0), 
-        BackgroundTransparency = 1, Text = Cfg.Name:lower(), 
-        TextColor3 = themes.preset.subtext, TextSize = 14, 
+        Parent = window.Items.TabHolder, Size = dim2(0, 0, 1, -16), 
+        BackgroundTransparency = 1, BackgroundColor3 = themes.preset.element, Text = Cfg.Name:lower(), 
+        TextColor3 = themes.preset.subtext, TextSize = 13, 
         FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium),
         AutomaticSize = Enum.AutomaticSize.X, AutoButtonColor = false, ZIndex = 5,
         Visible = (window.TabInfo == self)
     })
+    Pulse:Themify(Items.Button, "element", "BackgroundColor3")
+    Pulse:Create("UICorner", {Parent = Items.Button, CornerRadius = dim(0, 4)})
+    Pulse:Create("UIPadding", {Parent = Items.Button, PaddingLeft = dim(0, 12), PaddingRight = dim(0, 12)})
     Pulse:Themify(Items.Button, "subtext", "TextColor3")
-
-    Items.Indicator = Pulse:Create("Frame", {
-        Parent = Items.Button, AnchorPoint = vec2(0.5, 1), Position = dim2(0.5, 0, 1, -8),
-        Size = dim2(1, 4, 0, 2), BackgroundTransparency = 1, BackgroundColor3 = themes.preset.accent, ZIndex = 6
-    })
-    Pulse:Themify(Items.Indicator, "accent", "BackgroundColor3")
 
     Items.Pages = Pulse:Create("CanvasGroup", { Parent = Pulse.Other, Size = dim2(1, 0, 1, 0), BackgroundTransparency = 1, Visible = false, GroupTransparency = 1 })
     Pulse:Create("UIListLayout", { Parent = Items.Pages, FillDirection = Enum.FillDirection.Horizontal, Padding = dim(0, 14) })
@@ -484,16 +472,14 @@ function Pulse:SubTab(properties)
         local buttonTween = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
         if oldSub then
-            Pulse:Tween(oldSub.Items.Button, {TextColor3 = themes.preset.subtext}, buttonTween)
-            Pulse:Tween(oldSub.Items.Indicator, {BackgroundTransparency = 1}, buttonTween)
+            Pulse:Tween(oldSub.Items.Button, {TextColor3 = themes.preset.subtext, BackgroundTransparency = 1}, buttonTween)
             Pulse:Tween(oldSub.Items.Pages, {GroupTransparency = 1, Position = dim2(0, 0, 0, 10)}, buttonTween)
             task.wait(0.25)
             oldSub.Items.Pages.Visible = false
             oldSub.Items.Pages.Parent = Pulse.Other
         end
 
-        Pulse:Tween(Items.Button, {TextColor3 = themes.preset.accent}, buttonTween)
-        Pulse:Tween(Items.Indicator, {BackgroundTransparency = 0}, buttonTween)
+        Pulse:Tween(Items.Button, {TextColor3 = themes.preset.accent, BackgroundTransparency = 0}, buttonTween)
         
         Items.Pages.Position = dim2(0, 0, 0, 10)
         Items.Pages.Parent = window.Items.PageHolder
@@ -535,24 +521,6 @@ function Pulse:Section(properties)
             ColorSequenceKeypoint.new(1, rgb(225, 225, 225))
         })
     })
-
-    -- THE GLOWING TOP LINE
-    Items.AccentLine = Pulse:Create("Frame", {
-        Parent = Items.Section, Size = dim2(1, 0, 0, 1), Position = dim2(0, 0, 0, 0),
-        BackgroundColor3 = themes.preset.accent, BorderSizePixel = 0, ZIndex = 2
-    })
-    Pulse:Themify(Items.AccentLine, "accent", "BackgroundColor3")
-
-    -- Glow for top line
-    local Glow = Pulse:Create("ImageLabel", {
-        Parent = Items.AccentLine, AnchorPoint = vec2(0.5, 0), Position = dim2(0.5, 0, 0, -10),
-        Size = dim2(1, 40, 0, 20), BackgroundTransparency = 1,
-        Image = "rbxassetid://18245826428", ImageColor3 = themes.preset.glow,
-        ScaleType = Enum.ScaleType.Slice, SliceCenter = rect(vec2(21, 21), vec2(79, 79)),
-        ImageTransparency = 0.6, ZIndex = 1
-    })
-    Pulse:Themify(Glow, "glow", "ImageColor3")
-
     Items.Header = Pulse:Create("Frame", { Parent = Items.Section, Size = dim2(1, 0, 0, 36), BackgroundTransparency = 1 })
     
     -- Section Title (Shifted left since there's no icon anymore)
@@ -1345,17 +1313,16 @@ function Pulse:Configs(window)
         Flag = "Pulse_StreamerMode",
         Callback = function(state)
             if state then
-                UserLbl.Text = "logged in as hidden"
+                window.Items.UserStatus.Text = "logged in as hidden"
                 window.Items.Avatar.Image = "rbxthumb://type=AvatarHeadShot&id=1&w=48&h=48" 
             else
-                UserLbl.Text = "logged in as " .. lp.Name
+                window.Items.UserStatus.Text = "logged in as " .. lp.Name
                 window.Items.Avatar.Image = "rbxthumb://type=AvatarHeadShot&id="..lp.UserId.."&w=48&h=48"
             end
         end
     })
 
     SectionRight:Label({Name = "Accent Color"}):Colorpicker({ Callback = function(color3) Pulse:RefreshTheme("accent", color3) end, Color = themes.preset.accent })
-    SectionRight:Label({Name = "Glow Color"}):Colorpicker({ Callback = function(color3) Pulse:RefreshTheme("glow", color3) end, Color = themes.preset.glow })
     SectionRight:Label({Name = "Background Color"}):Colorpicker({ Callback = function(color3) Pulse:RefreshTheme("background", color3) end, Color = themes.preset.background })
     SectionRight:Label({Name = "Section Color"}):Colorpicker({ Callback = function(color3) Pulse:RefreshTheme("section", color3) end, Color = themes.preset.section })
     SectionRight:Label({Name = "Element Color"}):Colorpicker({ Callback = function(color3) Pulse:RefreshTheme("element", color3) end, Color = themes.preset.element })
@@ -1391,4 +1358,4 @@ function Pulse:Configs(window)
     })
 end
 
-return Pulse
+return Pulse, Flags
