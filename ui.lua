@@ -379,110 +379,133 @@ function Pulse:Tab(properties)
     local Cfg = { 
         Name = properties.Name or properties.name or "Tab", 
         Icon = properties.Icon or properties.icon or "rbxassetid://11293977610", 
-        Hidden = properties.Hidden or properties.hidden or false, 
-        Items = {} 
+        Items = {}, SubTabs = {}, ActiveSubTab = nil, Window = self
     }
     if tonumber(Cfg.Icon) then Cfg.Icon = "rbxassetid://" .. tostring(Cfg.Icon) end
     local Items = Cfg.Items
 
-    if not Cfg.Hidden then
-        -- Sidebar Icon Button
-        Items.SidebarButton = Pulse:Create("TextButton", { 
-            Parent = self.Items.TabList, Size = dim2(0, 45, 0, 45), 
-            BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 5 
-        })
-        Pulse:Create("UICorner", { Parent = Items.SidebarButton, CornerRadius = dim(0, 8) })
+    -- Sidebar Icon Button
+    Items.SidebarButton = Pulse:Create("TextButton", { 
+        Parent = self.Items.TabList, Size = dim2(0, 45, 0, 45), 
+        BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 5 
+    })
+    Pulse:Create("UICorner", { Parent = Items.SidebarButton, CornerRadius = dim(0, 8) })
+    
+    Items.SidebarIcon = Pulse:Create("ImageLabel", { 
+        Parent = Items.SidebarButton, AnchorPoint = vec2(0.5, 0.5), Position = dim2(0.5, 0, 0.5, 0),
+        Size = dim2(0, 22, 0, 22), BackgroundTransparency = 1, 
+        Image = Cfg.Icon, ImageColor3 = themes.preset.subtext, ZIndex = 6 
+    })
+    Pulse:Themify(Items.SidebarIcon, "subtext", "ImageColor3")
+
+    function Cfg.OpenTab()
+        if self.IsSwitchingTab or self.TabInfo == Cfg then return end
+        local oldTab = self.TabInfo
+        self.TabInfo = Cfg
+
+        local buttonTween = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+
+        if oldTab then
+            Pulse:Tween(oldTab.Items.SidebarIcon, {ImageColor3 = themes.preset.subtext}, buttonTween)
+            Pulse:Tween(oldTab.Items.SidebarButton, {BackgroundTransparency = 1}, buttonTween)
+            for _, sub in ipairs(oldTab.SubTabs) do sub.Items.Button.Visible = false end
+            if oldTab.ActiveSubTab then
+                Pulse:Tween(oldTab.ActiveSubTab.Items.Pages, {GroupTransparency = 1, Position = dim2(0, 0, 0, 10)}, buttonTween)
+                task.wait(0.25)
+                oldTab.ActiveSubTab.Items.Pages.Visible = false
+                oldTab.ActiveSubTab.Items.Pages.Parent = Pulse.Other
+            end
+        end
+
+        Pulse:Tween(Items.SidebarIcon, {ImageColor3 = themes.preset.accent}, buttonTween)
+        Pulse:Tween(Items.SidebarButton, {BackgroundTransparency = 0.9}, buttonTween) 
         
-        Items.SidebarIcon = Pulse:Create("ImageLabel", { 
-            Parent = Items.SidebarButton, AnchorPoint = vec2(0.5, 0.5), Position = dim2(0.5, 0, 0.5, 0),
-            Size = dim2(0, 22, 0, 22), BackgroundTransparency = 1, 
-            Image = Cfg.Icon, ImageColor3 = themes.preset.subtext, ZIndex = 6 
-        })
-        Pulse:Themify(Items.SidebarIcon, "subtext", "ImageColor3")
-
-        -- Top Text Tab Button
-        Items.Button = Pulse:Create("TextButton", { 
-            Parent = self.Items.TabHolder, Size = dim2(0, 0, 1, 0), 
-            BackgroundTransparency = 1, Text = Cfg.Name:lower(), 
-            TextColor3 = themes.preset.subtext, TextSize = 14, 
-            FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium),
-            AutomaticSize = Enum.AutomaticSize.X, AutoButtonColor = false, ZIndex = 5 
-        })
-        Pulse:Themify(Items.Button, "subtext", "TextColor3")
-
-        Items.Indicator = Pulse:Create("Frame", {
-            Parent = Items.Button, AnchorPoint = vec2(0.5, 1), Position = dim2(0.5, 0, 1, -8),
-            Size = dim2(1, 4, 0, 2), BackgroundTransparency = 1, BackgroundColor3 = themes.preset.accent, ZIndex = 6
-        })
-        Pulse:Themify(Items.Indicator, "accent", "BackgroundColor3")
+        for _, sub in ipairs(Cfg.SubTabs) do sub.Items.Button.Visible = true end
+        if Cfg.ActiveSubTab then Cfg.ActiveSubTab.OpenSubTab() 
+        elseif Cfg.SubTabs[1] then Cfg.SubTabs[1].OpenSubTab() end
     end
+
+    Items.SidebarButton.MouseButton1Down:Connect(Cfg.OpenTab)
+    if not self.TabInfo then task.spawn(Cfg.OpenTab) end
+
+    -- Backward compatibility for Section to SubTab
+    function Cfg:Section(props)
+        if not self.DefaultSubTab then self.DefaultSubTab = self:SubTab({ Name = "Main", Hidden = true }) end
+        return self.DefaultSubTab:Section(props)
+    end
+
+    return setmetatable(Cfg, Pulse)
+end
+
+function Pulse:SubTab(properties)
+    local Cfg = {
+        Name = properties.Name or properties.name or "SubTab",
+        Hidden = properties.Hidden or properties.hidden or false,
+        Items = {}
+    }
+    local window = self.Window
+    local Items = Cfg.Items
+    table.insert(self.SubTabs, Cfg)
+
+    Items.Button = Pulse:Create("TextButton", { 
+        Parent = window.Items.TabHolder, Size = dim2(0, 0, 1, 0), 
+        BackgroundTransparency = 1, Text = Cfg.Name:lower(), 
+        TextColor3 = themes.preset.subtext, TextSize = 14, 
+        FontFace = Font.new("rbxassetid://12187365364", Enum.FontWeight.Medium),
+        AutomaticSize = Enum.AutomaticSize.X, AutoButtonColor = false, ZIndex = 5,
+        Visible = (window.TabInfo == self)
+    })
+    Pulse:Themify(Items.Button, "subtext", "TextColor3")
+
+    Items.Indicator = Pulse:Create("Frame", {
+        Parent = Items.Button, AnchorPoint = vec2(0.5, 1), Position = dim2(0.5, 0, 1, -8),
+        Size = dim2(1, 4, 0, 2), BackgroundTransparency = 1, BackgroundColor3 = themes.preset.accent, ZIndex = 6
+    })
+    Pulse:Themify(Items.Indicator, "accent", "BackgroundColor3")
 
     Items.Pages = Pulse:Create("CanvasGroup", { Parent = Pulse.Other, Size = dim2(1, 0, 1, 0), BackgroundTransparency = 1, Visible = false, GroupTransparency = 1 })
     Pulse:Create("UIListLayout", { Parent = Items.Pages, FillDirection = Enum.FillDirection.Horizontal, Padding = dim(0, 14) })
     Pulse:Create("UIPadding", { Parent = Items.Pages, PaddingTop = dim(0, 10), PaddingBottom = dim(0, 10), PaddingRight = dim(0, 20), PaddingLeft = dim(0, 20) })
 
-    Items.Left = Pulse:Create("ScrollingFrame", { 
-        Parent = Items.Pages, Size = dim2(0.5, -7, 1, 0), BackgroundTransparency = 1, 
-        ScrollBarThickness = 0, CanvasSize = dim2(0, 0, 0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y
-    })
+    Items.Left = Pulse:Create("ScrollingFrame", { Parent = Items.Pages, Size = dim2(0.5, -7, 1, 0), BackgroundTransparency = 1, ScrollBarThickness = 0, AutomaticCanvasSize = Enum.AutomaticSize.Y })
     Pulse:Create("UIListLayout", { Parent = Items.Left, Padding = dim(0, 14) })
     Pulse:Create("UIPadding", { Parent = Items.Left, PaddingBottom = dim(0, 10) })
 
-    Items.Right = Pulse:Create("ScrollingFrame", { 
-        Parent = Items.Pages, Size = dim2(0.5, -7, 1, 0), BackgroundTransparency = 1, 
-        ScrollBarThickness = 0, CanvasSize = dim2(0, 0, 0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y
-    })
+    Items.Right = Pulse:Create("ScrollingFrame", { Parent = Items.Pages, Size = dim2(0.5, -7, 1, 0), BackgroundTransparency = 1, ScrollBarThickness = 0, AutomaticCanvasSize = Enum.AutomaticSize.Y })
     Pulse:Create("UIListLayout", { Parent = Items.Right, Padding = dim(0, 14) })
     Pulse:Create("UIPadding", { Parent = Items.Right, PaddingBottom = dim(0, 10) })
 
-    function Cfg.OpenTab()
-        if self.IsSwitchingTab or self.TabInfo == Cfg.Items then return end
-        local oldTab = self.TabInfo
-        self.IsSwitchingTab = true
-        self.TabInfo = Cfg.Items
+    function Cfg.OpenSubTab()
+        if window.IsSwitchingTab or self.ActiveSubTab == Cfg then return end
+        local oldSub = self.ActiveSubTab
+        window.IsSwitchingTab = true
+        self.ActiveSubTab = Cfg
 
         local buttonTween = TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
-        if oldTab and oldTab.Button then
-            Pulse:Tween(oldTab.Button, {TextColor3 = themes.preset.subtext}, buttonTween)
-            Pulse:Tween(oldTab.Indicator, {BackgroundTransparency = 1}, buttonTween)
-            Pulse:Tween(oldTab.SidebarIcon, {ImageColor3 = themes.preset.subtext}, buttonTween)
-            Pulse:Tween(oldTab.SidebarButton, {BackgroundTransparency = 1}, buttonTween)
+        if oldSub then
+            Pulse:Tween(oldSub.Items.Button, {TextColor3 = themes.preset.subtext}, buttonTween)
+            Pulse:Tween(oldSub.Items.Indicator, {BackgroundTransparency = 1}, buttonTween)
+            Pulse:Tween(oldSub.Items.Pages, {GroupTransparency = 1, Position = dim2(0, 0, 0, 10)}, buttonTween)
+            task.wait(0.25)
+            oldSub.Items.Pages.Visible = false
+            oldSub.Items.Pages.Parent = Pulse.Other
         end
 
-        if Items.Button then 
-            Pulse:Tween(Items.Button, {TextColor3 = themes.preset.accent}, buttonTween)
-            Pulse:Tween(Items.Indicator, {BackgroundTransparency = 0}, buttonTween)
-            Pulse:Tween(Items.SidebarIcon, {ImageColor3 = themes.preset.accent}, buttonTween)
-            Pulse:Tween(Items.SidebarButton, {BackgroundTransparency = 0.9}, buttonTween) 
-        end
+        Pulse:Tween(Items.Button, {TextColor3 = themes.preset.accent}, buttonTween)
+        Pulse:Tween(Items.Indicator, {BackgroundTransparency = 0}, buttonTween)
         
-        task.spawn(function()
-            if oldTab then
-                Pulse:Tween(oldTab.Pages, {GroupTransparency = 1, Position = dim2(0, 0, 0, 10)}, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out))
-                task.wait(0.2)
-                oldTab.Pages.Visible = false
-                oldTab.Pages.Parent = Pulse.Other
-            end
-
-            Items.Pages.Position = dim2(0, 0, 0, 10) 
-            Items.Pages.GroupTransparency = 1
-            Items.Pages.Parent = self.Items.PageHolder
-            Items.Pages.Visible = true
-
-            Pulse:Tween(Items.Pages, {GroupTransparency = 0, Position = dim2(0, 0, 0, 0)}, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out))
-            task.wait(0.35)
-            
-            Items.Pages.GroupTransparency = 0 
-            self.IsSwitchingTab = false
-        end)
+        Items.Pages.Position = dim2(0, 0, 0, 10)
+        Items.Pages.Parent = window.Items.PageHolder
+        Items.Pages.Visible = true
+        Pulse:Tween(Items.Pages, {GroupTransparency = 0, Position = dim2(0, 0, 0, 0)}, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out))
+        task.wait(0.35)
+        window.IsSwitchingTab = false
     end
 
-    if Items.Button then 
-        Items.Button.MouseButton1Down:Connect(Cfg.OpenTab) 
-        Items.SidebarButton.MouseButton1Down:Connect(Cfg.OpenTab)
-    end
-    if not self.TabInfo and not Cfg.Hidden then Cfg.OpenTab() end
+    Items.Button.MouseButton1Down:Connect(Cfg.OpenSubTab)
+    if Cfg.Hidden then Items.Button.Size = dim2(0, 0, 0, 0); Items.Button.Visible = false end
+
     return setmetatable(Cfg, Pulse)
 end
 
