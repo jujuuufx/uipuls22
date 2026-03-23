@@ -7,7 +7,7 @@ A lightweight, clean UI library for Roblox scripts.
 First, you need to load the library in your script:
 
 ```lua
-local Library = loadstring(game:HttpGet(""))()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/jujuuufx/uipuls22/refs/heads/main/ui.lua"))()
 ```
 
 ## Creating a Window
